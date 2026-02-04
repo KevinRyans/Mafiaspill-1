@@ -1,4 +1,4 @@
-﻿# Mafiaspill: Krystallkontroll
+﻿# Mafiaspill: Crypto Versjon
 
 Et moderne, tekstbasert MMO-inspirert crime-RPG med "crypto noir" og økokrim-tema. Alt er 100% fiktivt og abstrahert. Ingen steg-for-steg eller realistiske metoder for ekte kriminalitet.
 
