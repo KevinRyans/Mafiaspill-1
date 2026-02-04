@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS "Business" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "ownerId" UUID NOT NULL,
+  "cityId" UUID NOT NULL,
+  name TEXT NOT NULL,
+  level INTEGER NOT NULL DEFAULT 1,
+  "baseIncome" INTEGER NOT NULL DEFAULT 120,
+  "lastCollectedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Business_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT "Business_cityId_fkey" FOREIGN KEY ("cityId") REFERENCES "City"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "Business_owner_idx" ON "Business"("ownerId");
+CREATE INDEX IF NOT EXISTS "Business_city_idx" ON "Business"("cityId");

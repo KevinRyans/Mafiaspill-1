@@ -1,0 +1,996 @@
+// Prisma schema for Mafiaspill
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  player
+  support
+  mod
+  admin
+}
+
+enum CrewRank {
+  recruit
+  associate
+  operator
+  strategist
+  captain
+  boss
+}
+
+enum ItemRarity {
+  common
+  uncommon
+  rare
+  epic
+  legendary
+}
+
+enum Currency {
+  fiat
+  token
+}
+
+enum ListingStatus {
+  active
+  sold
+  cancelled
+  expired
+}
+
+enum MissionStatus {
+  pending
+  success
+  failed
+}
+
+enum CombatStatus {
+  active
+  resolved
+  abandoned
+}
+
+model Combat {
+  id         String       @id @default(uuid())
+  type       String
+  attackerId String
+  defenderId String
+  winnerId   String?
+  status     CombatStatus @default(active)
+  resolvedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  attacker   User         @relation("CombatAttacker", fields: [attackerId], references: [id])
+  defender   User         @relation("CombatDefender", fields: [defenderId], references: [id])
+  turns      CombatTurn[]
+  pvpMatch   PvpMatch?
+}
+
+model CombatTurn {
+  id         String   @id @default(uuid())
+  combatId   String
+  turnNumber Int
+  attackerId String
+  defenderId String
+  damage     Int
+  crit       Boolean
+  evaded     Boolean
+  defenderHp Int
+  createdAt  DateTime @default(now())
+
+  combat     Combat   @relation(fields: [combatId], references: [id])
+}
+
+model PvpMatch {
+  id             String   @id @default(uuid())
+  combatId       String   @unique
+  attackerId     String
+  defenderId     String
+  stakeFiat      Int      @default(0)
+  cooldownEndsAt DateTime
+  createdAt      DateTime @default(now())
+
+  combat         Combat   @relation(fields: [combatId], references: [id])
+}
+
+enum BanType {
+  ban
+  mute
+}
+
+enum ChatChannel {
+  global
+  crew
+  system
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  role             Role     @default(player)
+  emailVerifiedAt  DateTime?
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastLoginAt      DateTime?
+
+  profile          Profile?
+  inventory        Inventory?
+  refreshTokens    RefreshToken[]
+  emailVerifications EmailVerification[]
+  passwordResets   PasswordReset[]
+  crewMemberships  CrewMember[]
+  crewLed          Crew[]    @relation("CrewLeader")
+  missionRuns      MissionRun[]
+  listings         MarketListing[] @relation("SellerListings")
+  marketOrders     MarketOrder[]
+  purchases        MarketTransaction[] @relation("BuyerTransactions")
+  sales            MarketTransaction[] @relation("SellerTransactions")
+  notifications    Notification[]
+  chatMessages     ChatMessage[]
+  combatAttacks    Combat[] @relation("CombatAttacker")
+  combatDefends    Combat[] @relation("CombatDefender")
+  adminActions     AdminAuditLog[] @relation("AdminActor")
+  bans             BanMute[] @relation("BannedUser")
+  contacts         UserContact[]
+  passiveRuns      PassiveRun[]
+  achievements     UserAchievement[]
+  location         UserLocation?
+  travelQueue      TravelQueue?
+  travelLogs       TravelLog[]
+  gamblingBets     GamblingBet[]
+  gamblingLimit    GamblingLimit?
+  contractsCreated Contract[]
+  contractAssignments ContractAssignment[]
+  wallet           Wallet?
+  respectPurchases RespectPurchase[]
+  businesses       Business[]
+  prisonInmate     PrisonInmate?
+  prisonBreaks     PrisonBreakAttempt[] @relation("PrisonRescuer")
+  benefitPurchases BenefitPurchase[]
+  kills            DeathLog[] @relation("KillLogs")
+  deaths           DeathLog[] @relation("DeathLogs")
+  garageCars       GarageCar[]
+  fightClubProfile FightClubProfile?
+  bankTransactions BankTransaction[]
+  bankCounterparty BankTransaction[] @relation("BankCounterparty")
+}
+
+model Profile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  displayName       String
+  avatarUrl         String?
+  title             String   @default("Rookie")
+  playstyle         String   @default("opportunist")
+  reputationTag     String   @default("ukjent")
+  bio               String?
+  specialization    String   @default("balansert")
+  respect           Int      @default(0)
+  respectSpent      Int      @default(0)
+  notoriety         Int      @default(0)
+  risk              Int      @default(10)
+  heat              Int      @default(0)
+  compliance        Int      @default(50)
+  walletReputation  Int      @default(50)
+  health            Int      @default(100)
+  defense           Int      @default(5000)
+  crimeXp           Int      @default(0)
+  carTheftXp        Int      @default(0)
+  houseRobberyXp    Int      @default(0)
+  playerRobberyXp   Int      @default(0)
+  downUntil         DateTime?
+  deaths            Int      @default(0)
+  energy            Int      @default(100)
+  energyUpdatedAt   DateTime @default(now())
+  lastGamblingAt    DateTime?
+  fiatBalance       Int      @default(500)
+  tokenBalance      Int      @default(100)
+  lastActionAt      DateTime?
+  lastMissionAt     DateTime?
+  lastCrimeAt       DateTime?
+  lastCarTheftAt    DateTime?
+  lastHouseRobberyAt DateTime?
+  lastPlayerRobberyAt DateTime?
+  lastTravelAt      DateTime?
+  lastPvpAt         DateTime?
+  lastPassiveAt     DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id])
+}
+
+model RespectUpgrade {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  description   String
+  cost          Int
+  effectKey     String
+  levelRequired Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  purchases     RespectPurchase[]
+}
+
+model RespectPurchase {
+  id        String   @id @default(uuid())
+  userId    String
+  upgradeId String
+  createdAt DateTime @default(now())
+
+  user     User           @relation(fields: [userId], references: [id])
+  upgrade  RespectUpgrade @relation(fields: [upgradeId], references: [id])
+}
+
+model BenefitPurchase {
+  id          String   @id @default(uuid())
+  userId      String
+  benefitCode String
+  benefitType String
+  amount      Int
+  currency    Currency
+  cost        Int
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Inventory {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  capacity  Int      @default(60)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+  items     ItemInstance[]
+}
+
+model Item {
+  id              String     @id @default(uuid())
+  name            String
+  description     String
+  category        String
+  rarity          ItemRarity
+  basePrice       Int
+  basePower       Int      @default(0)
+  provenanceBase  Int      @default(50)
+  isCraftable     Boolean  @default(false)
+  craftMinutes    Int      @default(0)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  instances       ItemInstance[]
+  listings        MarketListing[]
+  orders          MarketOrder[]
+}
+
+model ItemInstance {
+  id              String   @id @default(uuid())
+  itemId          String
+  inventoryId     String
+  ownerId         String
+  quantity        Int      @default(1)
+  provenanceScore Int      @default(50)
+  durability      Int      @default(100)
+  equipped        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  item            Item      @relation(fields: [itemId], references: [id])
+  inventory       Inventory @relation(fields: [inventoryId], references: [id])
+}
+
+model Crew {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  description  String
+  bankFiat     Int      @default(0)
+  bankToken    Int      @default(0)
+  recruitmentOpen Boolean @default(true)
+  territoryLevel Int    @default(1)
+  leaderId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  leader       User     @relation("CrewLeader", fields: [leaderId], references: [id])
+  members      CrewMember[]
+  bankLogs     CrewBankTransaction[]
+  chatMessages ChatMessage[]
+  events       CrewEvent[]
+}
+
+model CrewMember {
+  id        String   @id @default(uuid())
+  crewId    String
+  userId    String
+  rank      CrewRank @default(recruit)
+  joinedAt  DateTime @default(now())
+
+  crew      Crew     @relation(fields: [crewId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([crewId, userId])
+}
+
+model CrewBankTransaction {
+  id        String   @id @default(uuid())
+  crewId    String
+  userId    String?
+  type      String
+  amountFiat Int     @default(0)
+  amountToken Int    @default(0)
+  reason    String
+  createdAt DateTime @default(now())
+
+  crew      Crew     @relation(fields: [crewId], references: [id])
+}
+
+model CrewEvent {
+  id        String   @id @default(uuid())
+  crewId    String
+  title     String
+  description String
+  startsAt  DateTime
+  createdAt DateTime @default(now())
+
+  crew      Crew     @relation(fields: [crewId], references: [id])
+}
+
+model Mission {
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  category      String   @default("oppdrag")
+  tier          Int
+  energyCost    Int
+  baseReward    Int
+  baseRisk      Int
+  cooldownMinutes Int
+  options       Json
+  requiredCarModelId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  runs          MissionRun[]
+  requiredCar   CarModel? @relation(fields: [requiredCarModelId], references: [id])
+}
+
+model MissionRun {
+  id             String        @id @default(uuid())
+  missionId      String
+  userId         String
+  status         MissionStatus @default(pending)
+  rewardFiat     Int           @default(0)
+  rewardToken    Int           @default(0)
+  riskDelta      Int           @default(0)
+  complianceImpact Int         @default(0)
+  choiceId       String
+  startedAt      DateTime      @default(now())
+  resolvedAt     DateTime?
+
+  mission        Mission       @relation(fields: [missionId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+  events         MissionEvent[]
+}
+
+model MissionEvent {
+  id           String   @id @default(uuid())
+  missionRunId String
+  eventType    String
+  message      String
+  createdAt    DateTime @default(now())
+
+  run          MissionRun @relation(fields: [missionRunId], references: [id])
+}
+
+model MarketListing {
+  id         String        @id @default(uuid())
+  itemId     String
+  sellerId   String
+  price      Int
+  currency   Currency
+  quantity   Int
+  status     ListingStatus @default(active)
+  createdAt  DateTime      @default(now())
+  expiresAt  DateTime?
+
+  item       Item          @relation(fields: [itemId], references: [id])
+  seller     User          @relation("SellerListings", fields: [sellerId], references: [id])
+  transactions MarketTransaction[]
+}
+
+model MarketOrder {
+  id        String   @id @default(uuid())
+  userId    String
+  itemId    String
+  maxPrice  Int
+  quantity  Int
+  currency  Currency
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  item      Item     @relation(fields: [itemId], references: [id])
+}
+
+model MarketTransaction {
+  id         String   @id @default(uuid())
+  listingId  String
+  buyerId    String
+  sellerId   String
+  price      Int
+  quantity   Int
+  currency   Currency
+  taxPaid    Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  listing    MarketListing @relation(fields: [listingId], references: [id])
+  buyer      User          @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  seller     User          @relation("SellerTransactions", fields: [sellerId], references: [id])
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  cash      Int      @default(0)
+  token     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+  bank      BankAccount?
+}
+
+model BankAccount {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Int      @default(0)
+  rate      Float    @default(0.01)
+  updatedAt DateTime @updatedAt
+
+  wallet    Wallet?  @relation(fields: [userId], references: [userId])
+}
+
+model BankTransaction {
+  id             String   @id @default(uuid())
+  userId         String
+  counterpartyId String?
+  direction      String
+  amount         Int
+  note           String?
+  createdAt      DateTime @default(now())
+
+  user           User     @relation(fields: [userId], references: [id])
+  counterparty   User?    @relation("BankCounterparty", fields: [counterpartyId], references: [id])
+}
+
+model Business {
+  id              String   @id @default(uuid())
+  ownerId         String
+  cityId          String
+  name            String
+  type            String   @default("firma")
+  level           Int      @default(1)
+  baseIncome      Int      @default(120)
+  lastCollectedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  owner           User     @relation(fields: [ownerId], references: [id])
+  city            City     @relation(fields: [cityId], references: [id])
+}
+
+model CarModel {
+  id         String   @id @default(uuid())
+  make       String
+  model      String
+  rarity     String
+  class      String
+  baseValue  Int
+  createdAt  DateTime @default(now())
+
+  cars       GarageCar[]
+  missions   Mission[]
+}
+
+model GarageCar {
+  id         String   @id @default(uuid())
+  userId     String
+  carModelId String
+  source     String   @default("car_theft")
+  status     String   @default("owned")
+  acquiredAt DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+  carModel   CarModel @relation(fields: [carModelId], references: [id])
+}
+
+model FightClubProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  style             String   @default("judo")
+  rating            Int      @default(100)
+  judoStrength      Int      @default(10)
+  jujutsuStrength   Int      @default(10)
+  karateStrength    Int      @default(10)
+  taekwondoStrength Int      @default(10)
+  league            String   @default("Rookie")
+  trainingEndsAt    DateTime?
+  trainingType      String?
+  pendingRatingGain Int      @default(0)
+  pendingStyleGain  Int      @default(0)
+  pendingCost       Int      @default(0)
+  lastTrainingAt    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id])
+}
+
+model City {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  controlLevel      Int      @default(50)
+  politicalPressure Int      @default(50)
+  economicHeat      Int      @default(50)
+  riskIndex         Int      @default(50)
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  contacts          Contact[]
+  state             CityState?
+  heat              CityHeat?
+  prisonInmates     PrisonInmate[]
+  deathLogs         DeathLog[]
+  contracts         Contract[]
+  businesses        Business[]
+  locations         UserLocation[]
+  travelFrom        TravelQueue[] @relation("TravelFrom")
+  travelTo          TravelQueue[] @relation("TravelTo")
+}
+
+model CityHeat {
+  id        String   @id @default(uuid())
+  cityId    String   @unique
+  heat      Int      @default(50)
+  updatedAt DateTime @updatedAt
+
+  city      City     @relation(fields: [cityId], references: [id])
+}
+
+model CityState {
+  id                String   @id @default(uuid())
+  cityId            String   @unique
+  policePressure    Int      @default(50)
+  marketMood        Int      @default(50)
+  travelRisk        Int      @default(20)
+  updatedAt         DateTime @updatedAt
+
+  city              City     @relation(fields: [cityId], references: [id])
+}
+
+model UserLocation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  cityId    String
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+  city      City     @relation(fields: [cityId], references: [id])
+}
+
+model TravelQueue {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  fromCityId String
+  toCityId   String
+  departAt  DateTime
+  arriveAt  DateTime
+  status    String   @default("enroute")
+
+  user      User     @relation(fields: [userId], references: [id])
+  fromCity  City     @relation("TravelFrom", fields: [fromCityId], references: [id])
+  toCity    City     @relation("TravelTo", fields: [toCityId], references: [id])
+}
+
+model TravelLog {
+  id        String   @id @default(uuid())
+  userId    String
+  fromCityId String
+  toCityId   String
+  cost      Int
+  riskDelta Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model PrisonInmate {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  cityId      String
+  jailedUntil DateTime
+  reason      String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  city        City     @relation(fields: [cityId], references: [id])
+  attempts    PrisonBreakAttempt[]
+}
+
+model PrisonBreakAttempt {
+  id         String   @id @default(uuid())
+  rescuerId  String
+  inmateId   String?
+  inmateUserId String?
+  result     String
+  reward     Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  inmate     PrisonInmate? @relation(fields: [inmateId], references: [id], onDelete: SetNull)
+  rescuer    User         @relation("PrisonRescuer", fields: [rescuerId], references: [id])
+}
+
+model Contact {
+  id            String   @id @default(uuid())
+  name          String
+  contactType   String
+  description   String
+  loyaltyBase   Int      @default(40)
+  riskAffinity  Int      @default(50)
+  icon          String?
+  cityId        String?
+  createdAt     DateTime @default(now())
+
+  city          City?    @relation(fields: [cityId], references: [id])
+  relations     UserContact[]
+  events        ContactEvent[]
+}
+
+model UserContact {
+  id           String   @id @default(uuid())
+  userId       String
+  contactId    String
+  trust        Int      @default(40)
+  loyalty      Int      @default(40)
+  status       String   @default("active")
+  lastEventAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id])
+  contact      Contact  @relation(fields: [contactId], references: [id])
+
+  @@unique([userId, contactId])
+}
+
+model ContactEvent {
+  id           String   @id @default(uuid())
+  contactId    String
+  userId       String?
+  eventType    String
+  message      String
+  createdAt    DateTime @default(now())
+
+  contact      Contact  @relation(fields: [contactId], references: [id])
+}
+
+model PassiveAction {
+  id              String   @id @default(uuid())
+  name            String
+  description     String
+  category        String
+  durationMinutes Int
+  baseRewardFiat  Int
+  baseRewardToken Int
+  risk            Int
+  requirements    Json?
+  createdAt       DateTime @default(now())
+
+  runs            PassiveRun[]
+}
+
+model PassiveRun {
+  id           String   @id @default(uuid())
+  userId       String
+  actionId     String
+  status       String   @default("active")
+  startedAt    DateTime @default(now())
+  endsAt       DateTime
+  claimedAt    DateTime?
+  rewardFiat   Int      @default(0)
+  rewardToken  Int      @default(0)
+  outcome      String   @default("pending")
+
+  user         User     @relation(fields: [userId], references: [id])
+  action       PassiveAction @relation(fields: [actionId], references: [id])
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String
+  icon        String?
+  points      Int      @default(10)
+  hidden      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  unlocks     UserAchievement[]
+}
+
+model UserAchievement {
+  id             String   @id @default(uuid())
+  userId         String
+  achievementId  String
+  unlockedAt     DateTime @default(now())
+
+  user           User        @relation(fields: [userId], references: [id])
+  achievement    Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+model GamblingGame {
+  id        String   @id @default(uuid())
+  name      String
+  type      String
+  minBet    Int
+  maxBet    Int
+  houseEdge Float
+  createdAt DateTime @default(now())
+
+  bets      GamblingBet[]
+}
+
+model GamblingBet {
+  id         String   @id @default(uuid())
+  userId     String
+  gameId     String
+  stake      Int
+  payout     Int      @default(0)
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+  game       GamblingGame @relation(fields: [gameId], references: [id])
+  result     GamblingResult?
+}
+
+model GamblingResult {
+  id        String   @id @default(uuid())
+  betId     String   @unique
+  outcome   String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  bet       GamblingBet @relation(fields: [betId], references: [id])
+}
+
+model GamblingLimit {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  dailyMax  Int      @default(600000000)
+  hourlyMax Int      @default(150000000)
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model LeaderboardCache {
+  id        String   @id @default(uuid())
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+model Contract {
+  id            String   @id @default(uuid())
+  creatorId     String
+  title         String
+  description   String
+  cityId        String
+  durationHours Int
+  rewardType    String
+  rewardTotal   Int
+  rewardPerUnit Int
+  status        String   @default("open")
+  createdAt     DateTime @default(now())
+
+  creator       User     @relation(fields: [creatorId], references: [id])
+  city          City     @relation(fields: [cityId], references: [id])
+  assignments   ContractAssignment[]
+  progress      ContractProgress[]
+  escrow        EscrowTransaction[]
+  disputes      Dispute[]
+}
+
+model ContractAssignment {
+  id         String   @id @default(uuid())
+  contractId String
+  userId     String
+  status     String   @default("active")
+  acceptedAt DateTime @default(now())
+
+  contract   Contract @relation(fields: [contractId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model ContractProgress {
+  id         String   @id @default(uuid())
+  contractId String
+  userId     String
+  units      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  contract   Contract @relation(fields: [contractId], references: [id])
+}
+
+model EscrowTransaction {
+  id         String   @id @default(uuid())
+  contractId String
+  fromUserId String
+  toUserId   String?
+  amount     Int
+  status     String   @default("reserved")
+  createdAt  DateTime @default(now())
+
+  contract   Contract @relation(fields: [contractId], references: [id])
+}
+
+model ReputationRating {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  score      Int
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+model Dispute {
+  id         String   @id @default(uuid())
+  contractId String
+  openedById String
+  reason     String
+  status     String   @default("open")
+  createdAt  DateTime @default(now())
+
+  contract   Contract @relation(fields: [contractId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  category  String   @default("system")
+  title     String
+  body      String
+  icon      String?
+  priority  Int      @default(1)
+  hidden    Boolean  @default(false)
+  revealAt  DateTime?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model DeathLog {
+  id        String   @id @default(uuid())
+  killerId  String
+  victimId  String
+  cityId    String?
+  reason    String   @default("pvp")
+  createdAt DateTime @default(now())
+
+  killer    User     @relation("KillLogs", fields: [killerId], references: [id])
+  victim    User     @relation("DeathLogs", fields: [victimId], references: [id])
+  city      City?    @relation(fields: [cityId], references: [id])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  crewId    String?
+  userId    String
+  channel   ChatChannel @default(global)
+  message   String
+  createdAt DateTime    @default(now())
+
+  crew      Crew?   @relation(fields: [crewId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  admin      User     @relation("AdminActor", fields: [adminId], references: [id])
+}
+
+model BanMute {
+  id         String   @id @default(uuid())
+  userId     String
+  type       BanType
+  reason     String
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  createdBy  String
+
+  user       User     @relation("BannedUser", fields: [userId], references: [id])
+}
+
+model WorldEvent {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  effectType  String
+  impactValue Float
+  startsAt    DateTime
+  endsAt      DateTime
+  active      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model ScheduledJob {
+  id         String   @id @default(uuid())
+  name       String
+  payload    Json?
+  runAt      DateTime
+  status     String   @default("pending")
+  lastRunAt  DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model EmailVerification {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  usedAt     DateTime?
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model PasswordReset {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  usedAt     DateTime?
+
+  user       User     @relation(fields: [userId], references: [id])
+}

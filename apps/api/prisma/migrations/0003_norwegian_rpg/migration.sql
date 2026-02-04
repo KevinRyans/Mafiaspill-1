@@ -1,0 +1,227 @@
+-- Norwegian RPG expansion
+ALTER TABLE "Profile"
+  ADD COLUMN IF NOT EXISTS "title" TEXT NOT NULL DEFAULT 'Rookie',
+  ADD COLUMN IF NOT EXISTS "playstyle" TEXT NOT NULL DEFAULT 'opportunist',
+  ADD COLUMN IF NOT EXISTS "reputationTag" TEXT NOT NULL DEFAULT 'ukjent',
+  ADD COLUMN IF NOT EXISTS "bio" TEXT,
+  ADD COLUMN IF NOT EXISTS "specialization" TEXT NOT NULL DEFAULT 'balansert',
+  ADD COLUMN IF NOT EXISTS "lastPassiveAt" TIMESTAMP(3);
+
+ALTER TABLE "Notification"
+  ADD COLUMN IF NOT EXISTS "category" TEXT NOT NULL DEFAULT 'system',
+  ADD COLUMN IF NOT EXISTS "icon" TEXT,
+  ADD COLUMN IF NOT EXISTS "priority" INTEGER NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS "hidden" BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS "revealAt" TIMESTAMP(3);
+
+CREATE TABLE IF NOT EXISTS "CrewEvent" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "crewId" UUID NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  "startsAt" TIMESTAMP(3) NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "CrewEvent_crewId_fkey" FOREIGN KEY ("crewId") REFERENCES "Crew"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "MarketOrder" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL,
+  "itemId" UUID NOT NULL,
+  "maxPrice" INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  currency "Currency" NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "MarketOrder_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT "MarketOrder_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "Item"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Wallet" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL UNIQUE,
+  cash INTEGER NOT NULL DEFAULT 0,
+  token INTEGER NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Wallet_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "BankAccount" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL UNIQUE,
+  balance INTEGER NOT NULL DEFAULT 0,
+  rate DOUBLE PRECISION NOT NULL DEFAULT 0.01,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "BankAccount_userId_fkey" FOREIGN KEY ("userId") REFERENCES "Wallet"("userId") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "City" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  "controlLevel" INTEGER NOT NULL DEFAULT 50,
+  "politicalPressure" INTEGER NOT NULL DEFAULT 50,
+  "economicHeat" INTEGER NOT NULL DEFAULT 50,
+  "riskIndex" INTEGER NOT NULL DEFAULT 50,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "CityState" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "cityId" UUID NOT NULL UNIQUE,
+  "policePressure" INTEGER NOT NULL DEFAULT 50,
+  "marketMood" INTEGER NOT NULL DEFAULT 50,
+  "travelRisk" INTEGER NOT NULL DEFAULT 20,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "CityState_cityId_fkey" FOREIGN KEY ("cityId") REFERENCES "City"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "UserLocation" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL UNIQUE,
+  "cityId" UUID NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "UserLocation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT "UserLocation_cityId_fkey" FOREIGN KEY ("cityId") REFERENCES "City"(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS "TravelQueue" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL UNIQUE,
+  "fromCityId" UUID NOT NULL,
+  "toCityId" UUID NOT NULL,
+  "departAt" TIMESTAMP(3) NOT NULL,
+  "arriveAt" TIMESTAMP(3) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'enroute',
+  CONSTRAINT "TravelQueue_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT "TravelQueue_fromCity_fkey" FOREIGN KEY ("fromCityId") REFERENCES "City"(id) ON DELETE RESTRICT,
+  CONSTRAINT "TravelQueue_toCity_fkey" FOREIGN KEY ("toCityId") REFERENCES "City"(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS "TravelLog" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL,
+  "fromCityId" UUID NOT NULL,
+  "toCityId" UUID NOT NULL,
+  cost INTEGER NOT NULL,
+  "riskDelta" INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "TravelLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "GamblingGame" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  "minBet" INTEGER NOT NULL,
+  "maxBet" INTEGER NOT NULL,
+  "houseEdge" DOUBLE PRECISION NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "GamblingBet" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL,
+  "gameId" UUID NOT NULL,
+  stake INTEGER NOT NULL,
+  payout INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "GamblingBet_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT "GamblingBet_gameId_fkey" FOREIGN KEY ("gameId") REFERENCES "GamblingGame"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "GamblingResult" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "betId" UUID NOT NULL UNIQUE,
+  outcome TEXT NOT NULL,
+  detail JSONB,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "GamblingResult_betId_fkey" FOREIGN KEY ("betId") REFERENCES "GamblingBet"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "GamblingLimit" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL,
+  "dailyMax" INTEGER NOT NULL DEFAULT 2000,
+  "hourlyMax" INTEGER NOT NULL DEFAULT 500,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "GamblingLimit_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "LeaderboardCache" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Contract" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "creatorId" UUID NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  "cityId" UUID NOT NULL,
+  "durationHours" INTEGER NOT NULL,
+  "rewardType" TEXT NOT NULL,
+  "rewardTotal" INTEGER NOT NULL,
+  "rewardPerUnit" INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Contract_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "ContractAssignment" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contractId" UUID NOT NULL,
+  "userId" UUID NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  "acceptedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ContractAssignment_contractId_fkey" FOREIGN KEY ("contractId") REFERENCES "Contract"(id) ON DELETE CASCADE,
+  CONSTRAINT "ContractAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "ContractProgress" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contractId" UUID NOT NULL,
+  "userId" UUID NOT NULL,
+  units INTEGER NOT NULL DEFAULT 0,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ContractProgress_contractId_fkey" FOREIGN KEY ("contractId") REFERENCES "Contract"(id) ON DELETE CASCADE,
+  CONSTRAINT "ContractProgress_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "EscrowTransaction" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contractId" UUID NOT NULL,
+  "fromUserId" UUID NOT NULL,
+  "toUserId" UUID,
+  amount INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'reserved',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "EscrowTransaction_contractId_fkey" FOREIGN KEY ("contractId") REFERENCES "Contract"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "ReputationRating" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "fromUserId" UUID NOT NULL,
+  "toUserId" UUID NOT NULL,
+  score INTEGER NOT NULL,
+  note TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Dispute" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contractId" UUID NOT NULL,
+  "openedById" UUID NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Dispute_contractId_fkey" FOREIGN KEY ("contractId") REFERENCES "Contract"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "Notification_userId_unread_idx" ON "Notification"("userId", "readAt");
+CREATE INDEX IF NOT EXISTS "UserLocation_userId_idx" ON "UserLocation"("userId");
+CREATE INDEX IF NOT EXISTS "GamblingBet_userId_idx" ON "GamblingBet"("userId");
+CREATE INDEX IF NOT EXISTS "Contract_creator_idx" ON "Contract"("creatorId");

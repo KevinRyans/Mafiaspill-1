@@ -1,0 +1,1 @@
+ALTER TABLE "Business" ADD COLUMN "type" TEXT NOT NULL DEFAULT 'firma';
